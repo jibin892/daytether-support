@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex">
+  <meta name="color-scheme" content="light dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+  <meta property="og:title" content="Family update · Daytether">
+  <meta property="og:description" content="Open this family update in Daytether.">
+  <title>Family update · Daytether</title>
+  <style>
+    :root { color-scheme: light dark; font: 100%/1.5 system-ui,sans-serif; color:#17342f; background:#eef5f1; --card:#fff; --action:#096855; --ink:#fff; --muted:#44645c }
+    @media(prefers-color-scheme:dark) { :root { color:#ecf7f1; background:#121d1a; --card:#1d2c28; --action:#a1e1c7; --ink:#12382c; --muted:#bbcec5 } }
+    * { box-sizing:border-box }
+    body { margin:0; min-height:100svh; display:grid; place-items:center; padding:1.25rem }
+    main { width:min(100%,29rem); padding:clamp(1.5rem,6vw,3rem); border-radius:1.5rem; background:var(--card) }
+    header { font-weight:650; color:var(--muted) }
+    h1 { margin:.9em 0 .2em; font-size:clamp(2rem,7vw,2.75rem); line-height:1.1; letter-spacing:-.04em }
+    p,summary { color:var(--muted) }
+    a,button { color:var(--action); font:inherit }
+    #open { display:block; width:100%; text-align:center; margin:1.4rem 0; background:var(--action); color:var(--ink); font-weight:650; padding:.8rem; border-radius:1rem; text-decoration:none }
+    summary,button { cursor:pointer }
+    button { background:transparent; border:1px solid currentColor; border-radius:.7rem; padding:.55rem .9rem }
+    textarea { width:100%; margin-top:.5rem; font:inherit }
+    :focus-visible { outline:3px solid currentColor; outline-offset:3px }
+    #open:focus-visible { outline-color:var(--action) }
+  </style>
+</head>
+<body>
+  <main>
+    <header>Daytether</header>
+    <h1>Family update</h1>
+    <p id="message">Open the complete link from your message to see this update.</p>
+    <noscript>Enable JavaScript to open this update.</noscript>
+    <div id="actions" hidden>
+      <a id="open">Open in Daytether</a>
+      <details>
+        <summary>Having trouble opening the app?</summary>
+        <p>Install Daytether on your phone, then tap the link again. Closed-test participants can <a href="https://play.google.com/apps/testing/com.personalhealth.daytether" rel="noreferrer">join the Android test</a> with their invited Google account.</p>
+        <p>If Daytether is already installed, copy the update. In the app, go to Family → Family options (⋯) → Family updates → Paste an update.</p>
+        <button id="copy" type="button">Copy update</button>
+        <span id="status" role="status"></span>
+        <textarea id="manual" rows="3" readonly hidden aria-label="Update to copy"></textarea>
+      </details>
+    </div>
+  </main>
+  <script>
+    const message = document.getElementById('message');
+    const actions = document.getElementById('actions');
+    const open = document.getElementById('open');
+    const manual = document.getElementById('manual');
+    const status = document.getElementById('status');
+    let appLink = '';
+    function loadUpdate() {
+      actions.hidden = true;
+      manual.hidden = true;
+      manual.value = '';
+      status.textContent = '';
+      appLink = '';
+      open.removeAttribute('href');
+      const match = /^#\/v1\/([A-Za-z0-9_-]{1,23900})$/.exec(location.hash);
+      if (match) {
+        try {
+          const token = match[1];
+          const bytes = Uint8Array.from(atob(token.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+          const update = JSON.parse(new TextDecoder('utf-8', {fatal:true}).decode(bytes));
+          if ((update.version === undefined || update.version === 1) && typeof update.id === 'string' && update.id &&
+              ['person','task','kind','status','whenText'].every(key => typeof update[key] === 'string') &&
+              Number.isSafeInteger(update.sharedAt) && update.sharedAt > 0) {
+            appLink = 'personalhealth://update/v1/' + token;
+            open.href = /Android/i.test(navigator.userAgent)
+              ? 'intent://update/v1/' + token + '#Intent;scheme=personalhealth;package=com.personalhealth.daytether;end'
+              : appLink;
+            message.textContent = 'Review the shared reminder in the app and choose whether to save it.';
+            actions.hidden = false;
+            return;
+          }
+        } catch { /* Show the incomplete-link message below. */ }
+      }
+      message.textContent = 'This link is incomplete. Ask the sender to share the update again.';
+    }
+    document.getElementById('copy').addEventListener('click', async () => {
+      if (!appLink) return;
+      try {
+        await navigator.clipboard.writeText(appLink);
+        status.textContent = 'Update copied.';
+      } catch {
+        manual.value = appLink;
+        manual.hidden = false;
+        manual.focus();
+        manual.select();
+        status.textContent = 'Select and copy the update below.';
+      }
+    });
+    window.addEventListener('hashchange', loadUpdate);
+    loadUpdate();
+  </script>
+</body>
+</html>
